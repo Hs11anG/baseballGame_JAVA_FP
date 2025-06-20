@@ -8,8 +8,12 @@ import java.io.IOException;
 import java.util.Random;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Arrays; // 新增導入
 
-public class MLBsim extends JPanel {
+import data.Pitcher; // 導入 Pitcher 類別
+import data.TrajectoryData; // 導入 TrajectoryData 類別
+
+public class GamePanel extends JPanel { // 將 MLBsim 改名為 GamePanel
     private Timer timer;
     private JFrame mainFrame;
 
@@ -64,23 +68,30 @@ public class MLBsim extends JPanel {
     private final double strikeZoneBottom_ft = 1.5;
 
     // 球種數據庫
-    private static class PitchData {
-        final double releaseSpeed_mph, horizontalMovement_in, verticalMovement_in, release_pos_x_ft, release_pos_z_ft;
-        PitchData(double speed, double h_mov, double v_mov, double rel_x, double rel_z) {
-            this.releaseSpeed_mph = speed;
-            this.horizontalMovement_in = h_mov;
-            this.verticalMovement_in = v_mov;
-            this.release_pos_x_ft = rel_x;
-            this.release_pos_z_ft = rel_z;
-        }
-    }
-    private final Map<String, PitchData> pitchDatabase = new HashMap<>();
+    private final Map<String, TrajectoryData> pitchDatabase = new HashMap<>(); // 修改類型為 TrajectoryData
+    private DatabaseManager dbManager; // 新增 DatabaseManager 實例
+    private Pitcher currentPitcher; // 新增變數來儲存當前投手
 
-    public MLBsim(boolean hittingMode, JFrame frame) {
+
+    public GamePanel(boolean hittingMode, JFrame frame, Pitcher selectedPitcher) {
         this.isHittingMode = hittingMode;
         this.mainFrame = frame;
+        this.currentPitcher = selectedPitcher; // 儲存選定的投手
+        this.dbManager = new DatabaseManager(); // 初始化 DatabaseManager
         
-        initializePitchDatabase();
+        if (isHittingMode) {
+            // 打擊模式可以預設載入所有球種或者某些通用球種
+            initialize_AllPitchesDefault(); // 創建一個預設的通用球種初始化方法
+        } else if (currentPitcher != null) {
+            // 投球模式，載入選定投手的球種
+            loadPitcherPitchData(currentPitcher.getPid());
+        } else {
+            // 處理沒有選擇投手但進入投球模式的情況 (例如直接啟動遊戲就進入投球模式)
+            // 這裡可以選擇載入一個預設投手，或者回到選擇介面
+            System.err.println("Warning: Pitching mode started without selected pitcher. Loading default pitches.");
+            initialize_AllPitchesDefault();
+        }
+
         setupKeyBindings();
         
         addMouseMotionListener(new MouseAdapter() {
@@ -99,7 +110,7 @@ public class MLBsim extends JPanel {
         timer.start();
 
         try {
-            ballImage = ImageIO.read(new File("src/ball.png"));
+            ballImage = ImageIO.read(new File("src/ball.png")); // 確保 ball.png 在 src 資料夾下
         } catch (IOException e) {
             System.err.println("Failed to load ball image: " + e.getMessage());
         }
@@ -108,62 +119,38 @@ public class MLBsim extends JPanel {
         resetPitch();
     }
     
-    private void initializePitchDatabase() {
-        initialize_AllPitches(this.pitchDatabase);
+    // 新增方法來從資料庫載入特定投手的球種數據
+    private void loadPitcherPitchData(int pitcherId) {
+        pitchDatabase.clear();
+        pitchDatabase.putAll(dbManager.getPitchDataForPitcher(pitcherId));
+        // 確保至少有一種球可以投，如果資料庫中沒有為該投手設定球種
+        if (pitchDatabase.isEmpty()) {
+            System.err.println("No pitch data found for pitcher PID: " + pitcherId + ". Loading default pitches.");
+            initialize_AllPitchesDefault();
+        }
     }
     
-    private void initialize_AllPitches(Map<String, PitchData> db) {
-        db.clear();
-        db.put("FF", new PitchData(94.0, -7.0, -15.0, -2.0, 6.0));
-        db.put("SI", new PitchData(93.0, -11.0, -23.0, -2.2, 5.8));
-        db.put("FC", new PitchData(89.0, 2.0, -25.0, -1.5, 6.1));
-        db.put("SL", new PitchData(85.0, 5.5, -36.0, -1.8, 5.9));
-        db.put("SW", new PitchData(83.0, 16.0, -40.0, -2.0, 5.9));
-        db.put("CU", new PitchData(79.0, 9.5, -55.0, -1.5, 6.2));
-        db.put("KC", new PitchData(81.0, 8.0, -50.0, -1.6, 6.1));
-        db.put("CH", new PitchData(84.5, -9.0, -28.0, -2.2, 5.8));
-        db.put("FS", new PitchData(86.0, -6.0, -34.0, -2.0, 6.0));
+    // 創建一個通用球種的預設初始化方法 (可以用於打擊模式或沒有特定投手時)
+    private void initialize_AllPitchesDefault() {
+        // 這裡可以使用資料庫中某個預設投手的球種，或者硬編碼一些基礎球種
+        // 為了方便，這裡暫時硬編碼一些數據，這些數據應與資料庫中的 Trajectory 表格相符
+        // PID 和 BID 這裡暫時設為 0，實際應與通用投手的 PID/BID 對應
+        pitchDatabase.put("4SEAMFAST", new TrajectoryData(0, 1, 33.0, -2.7, -13.5, -2.2, 5.8, 96.8));
+        pitchDatabase.put("SLIDER", new TrajectoryData(0, 2, 35.0, 8.6, -32.4, -2.4, 5.7, 83.8));
+        pitchDatabase.put("CURVE", new TrajectoryData(0, 3, 9.0, 6.9, -46.9, -2.1, 5.2, 81.0));
+        pitchDatabase.put("CHANGE", new TrajectoryData(0, 4, 9.0, -10.1, -27.2, -2.6, 5.6, 88.4));
+        pitchDatabase.put("SINKER", new TrajectoryData(0, 5, 6.0, -8.7, -22.8, -2.3, 5.7, 94.3));
+        pitchDatabase.put("SPLIT", new TrajectoryData(0, 6, 6.0, -4.0, -28.0, -2.0, 6.1, 88.6));
+        pitchDatabase.put("SWEEPER", new TrajectoryData(0, 7, 15.0, 2.0, -25.6, -2.4, 5.7, 88.6));
+        pitchDatabase.put("CUTTER", new TrajectoryData(0, 8, 15.0, 2.0, -25.6, -2.4, 5.7, 88.6));
     }
     
-    private void initialize_ZackWheeler(Map<String, PitchData> db) {
-        db.clear();
-        db.put("FF", new PitchData(95.2, -8.2, -15.5, -1.8, 6.1));
-        db.put("SI", new PitchData(94.5, -10.0, -20.3, -1.9, 5.2));
-        db.put("SL", new PitchData(90.8, 3.0, -24.0, -1.7, 6.1));
-        db.put("CU", new PitchData(81.0, 9.0, -48.0, -1.5, 6.2));
-    }
-
-    private void initialize_MaxFried(Map<String, PitchData> db) {
-        db.clear();
-        db.put("CU", new PitchData(74.5, -15.0, -58.0, 2.0, 6.0));
-        db.put("SI", new PitchData(93.8, 11.5, -23.5, 1.9, 5.9));
-        db.put("FF", new PitchData(93.9, 9.0, -16.0, 1.8, 6.0));
-        db.put("SL", new PitchData(84.7, -7.8, -35.0, 1.9, 6.0));
-        db.put("CH", new PitchData(87.0, 11.0, -30.0, 2.1, 5.8));
-    }
-
-    private void initialize_ShoheiOhtani(Map<String, PitchData> db) {
-        db.clear();
-        db.put("SW", new PitchData(85.0, 17.0, -38.5, -1.9, 6.0));
-        db.put("FS", new PitchData(87.8, -8.5, -35.0, -2.0, 5.9));
-        db.put("FF", new PitchData(96.8, -7.5, -15.0, -1.8, 6.1));
-        db.put("CU", new PitchData(77.5, 10.5, -54.0, -1.7, 6.2));
-        db.put("FC", new PitchData(91.0, 2.5, -28.0, -1.8, 6.1));
-    }
-
-    private void initialize_PaulSkenes(Map<String, PitchData> db) {
-        db.clear();
-        db.put("FF", new PitchData(99.8, -8.6, -25.66, -2.4, 5.6));
-        db.put("FS", new PitchData(95.1, -13.0, -30.0, -2.0, 5.8));
-        db.put("SL", new PitchData(86.8, 7.0, -34.0, -1.8, 6.1));
-        db.put("CU", new PitchData(83.5, 7.5, -46.0, -1.7, 6.2));
-    }
-
-    private void initialize_TylerRogers(Map<String, PitchData> db) {
-        db.clear();
-        db.put("SI", new PitchData(83.16, -0.99, -47.89, -3.82, 1.26));
-        db.put("SL", new PitchData(73.94, 5.92, -32.58, -3.82, 1.30));
-    }
+    // 移除原有的初始化特定投手數據的方法
+    // private void initialize_ZackWheeler(Map<String, PitchData> db) { ... }
+    // private void initialize_MaxFried(Map<String, PitchData> db) { ... }
+    // private void initialize_ShoheiOhtani(Map<String, PitchData> db) { ... }
+    // private void initialize_PaulSkenes(Map<String, PitchData> db) { ... }
+    // private void initialize_TylerRogers(Map<String, PitchData> db) { ... }
 
     private Point project3D(double objX_ft, double objY_ft, double objZ_ft) {
         double deltaX = objX_ft - 0;
@@ -185,34 +172,54 @@ public class MLBsim extends JPanel {
     }
 
     private void calculateRealisticTrajectory(String type) {
-        PitchData data = pitchDatabase.get(type);
-        if (data == null) data = pitchDatabase.values().iterator().next();
+        TrajectoryData data = pitchDatabase.get(type); // 使用 TrajectoryData
+        if (data == null) {
+            System.err.println("Pitch type " + type + " data not found. Using a default pitch.");
+            data = pitchDatabase.values().iterator().next(); // 使用任一可用球種作為備用
+        }
         this.pitchType = type;
-        startX_ft = data.release_pos_x_ft;
-        startY_ft = data.release_pos_z_ft;
-        startZ_ft = PITCHER_MOUND_DISTANCE_FT;
+        
+        // 使用 TrajectoryData 中的釋放點
+        startX_ft = data.getRex(); 
+        startY_ft = data.getRey(); 
+        startZ_ft = PITCHER_MOUND_DISTANCE_FT; // 投手丘距離
+        
         x_ft = startX_ft; y_ft = startY_ft; z_ft = startZ_ft;
-        double releaseSpeed_fts = data.releaseSpeed_mph * 1.467;
-        double pfx_x_ft = data.horizontalMovement_in / 12.0;
-        double pfx_z_ft = data.verticalMovement_in / 12.0;
+        
+        // 從 TrajectoryData 獲取速度和位移
+        double releaseSpeed_mph = data.getSpeed();
+        double horizontalMovement_in = data.getHmov();
+        double verticalMovement_in = data.getVmov();
+
+        double releaseSpeed_fts = releaseSpeed_mph * 1.467; // mph 轉 fts
+        double pfx_x_ft = horizontalMovement_in / 12.0; // inches 轉 ft
+        double pfx_z_ft = verticalMovement_in / 12.0; // inches 轉 ft
+
         double flightDistance = startZ_ft - endZ_ft;
         double flightTime = flightDistance / releaseSpeed_fts;
+
+        // 計算加速度
         this.ax = (2 * pfx_x_ft) / (flightTime * flightTime);
         this.ay = (2 * pfx_z_ft) / (flightTime * flightTime);
+        
         double targetX, targetY;
         if (isHittingMode) {
-            if (random.nextDouble() < 0.6) {
+            // 打擊模式下，球路落點隨機化
+            if (random.nextDouble() < 0.6) { // 60% 機率投進好球帶
                 targetX = random.nextDouble() * (strikeZoneRight_ft - strikeZoneLeft_ft) + strikeZoneLeft_ft;
                 targetY = random.nextDouble() * (strikeZoneTop_ft - strikeZoneBottom_ft) + strikeZoneBottom_ft;
-            } else {
+            } else { // 40% 機率投在好球帶外
                 double margin = 0.5;
                 targetX = (random.nextBoolean() ? 1 : -1) * (strikeZoneRight_ft + margin);
                 targetY = random.nextDouble() * (strikeZoneTop_ft + margin - (strikeZoneBottom_ft - margin)) + (strikeZoneBottom_ft - margin);
             }
         } else {
+            // 投球模式下，球路落點根據玩家瞄準決定
             targetX = this.aimX_ft;
             targetY = this.aimY_ft;
         }
+
+        // 計算初始速度
         this.vx = ((targetX - startX_ft) / flightTime) - (0.5 * ax * flightTime);
         this.vy = ((targetY - startY_ft) / flightTime) - (0.5 * ay * flightTime);
         this.vz = releaseSpeed_fts;
@@ -235,9 +242,10 @@ public class MLBsim extends JPanel {
             vy += ay * frameTime;
             x_ft += vx * frameTime;
             y_ft += vy * frameTime;
-            z_ft -= vz * frameTime;
+            z_ft -= vz * frameTime; // 球向攝影機 (Z軸負方向) 移動
             
             if (z_ft <= endZ_ft) {
+                // 球到達本壘板前的精確位置
                 double z_travel_in_frame = prev_z - z_ft;
                 if (z_travel_in_frame > 0) {
                     double fraction = (prev_z - endZ_ft) / z_travel_in_frame;
@@ -247,7 +255,10 @@ public class MLBsim extends JPanel {
                 z_ft = endZ_ft;
                 isPitching = false;
                 ballReachedCatcher = true;
+
+                // 判斷是否為好球
                 boolean isStrike = x_ft >= strikeZoneLeft_ft && x_ft <= strikeZoneRight_ft && y_ft >= strikeZoneBottom_ft && y_ft <= strikeZoneTop_ft;
+                
                 if (isHittingMode && !swingAttempted) {
                     hitResult = isStrike ? "Strike" : "Ball";
                 }
@@ -262,15 +273,23 @@ public class MLBsim extends JPanel {
         pitchType = "none";
         hitResult = null;
         if (isHittingMode) { countdown = 180; }
-        PitchData data = pitchDatabase.values().iterator().next();
-        x_ft = data.release_pos_x_ft;
-        y_ft = data.release_pos_z_ft;
+        
+        // 重置球的位置到投手釋放點
+        // 確保 pitchDatabase 不為空，以防資料載入失敗
+        TrajectoryData data = pitchDatabase.isEmpty() ? new TrajectoryData(0,0,0,0,0, -2.0, 6.0, 90.0) : pitchDatabase.values().iterator().next(); 
+        x_ft = data.getRex();
+        y_ft = data.getRey();
         z_ft = PITCHER_MOUND_DISTANCE_FT;
         lastFrameTime = System.nanoTime();
         repaint();
     }
     
     private String randomPitchType() {
+        // 確保 pitchDatabase 不為空
+        if (pitchDatabase.isEmpty()) {
+            // 如果資料庫為空，可以考慮拋出錯誤或返回一個預設球種
+            return "4SEAMFAST"; // 備用
+        }
         Object[] types = pitchDatabase.keySet().toArray();
         return (String) types[random.nextInt(types.length)];
     }
@@ -278,6 +297,7 @@ public class MLBsim extends JPanel {
     private void startPitch(String type) {
         if (!pitchDatabase.containsKey(type)) {
             System.err.println("Pitch type " + type + " not in current pitcher's arsenal.");
+            // 可以選擇不投球，或投一個預設球種
             return;
         }
         if (!isPitching && !isPaused) {
@@ -319,7 +339,7 @@ public class MLBsim extends JPanel {
         Point groundStart = project3D(0, 0, PITCHER_MOUND_DISTANCE_FT);
         Point groundEnd = project3D(0, 0, 0);
         if(groundStart != null && groundEnd != null) {
-            g2d.setColor(new Color(188, 143, 143));
+            g2d.setColor(new Color(188, 143, 143)); // 土色
             Polygon dirtArea = new Polygon();
             dirtArea.addPoint(groundStart.x - 200, groundStart.y);
             dirtArea.addPoint(groundStart.x + 200, groundStart.y);
@@ -331,7 +351,7 @@ public class MLBsim extends JPanel {
 
     private void drawStrikeZone(Graphics2D g2d) {
         g2d.setStroke(new BasicStroke(3));
-        g2d.setColor(new Color(255, 255, 255, 100));
+        g2d.setColor(new Color(255, 255, 255, 100)); // 半透明白色
         Point tl = project3D(strikeZoneLeft_ft, strikeZoneTop_ft, endZ_ft);
         Point tr = project3D(strikeZoneRight_ft, strikeZoneTop_ft, endZ_ft);
         Point bl = project3D(strikeZoneLeft_ft, strikeZoneBottom_ft, endZ_ft);
@@ -348,7 +368,7 @@ public class MLBsim extends JPanel {
         Point moundCenter = project3D(0, 0, PITCHER_MOUND_DISTANCE_FT);
         if (moundCenter != null) {
             int moundSize = calculateBallSize(PITCHER_MOUND_DISTANCE_FT) * 10;
-            g2d.setColor(new Color(160, 82, 45));
+            g2d.setColor(new Color(160, 82, 45)); // 深土色
             g2d.fillOval(moundCenter.x - moundSize/2, moundCenter.y - moundSize/4, moundSize, moundSize/2);
         }
     }
@@ -364,11 +384,14 @@ public class MLBsim extends JPanel {
     }
 
     private void drawUI(Graphics2D g2d) {
-        g2d.setColor(new Color(0, 0, 0, 150));
-        g2d.fillRoundRect(10, 10, 500, 160, 10, 10);
+        g2d.setColor(new Color(0, 0, 0, 150)); // 半透明黑色背景
+        g2d.fillRoundRect(10, 10, 500, 160, 10, 10); // 調整高度以容納更多信息
+
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 16));
-        g2d.drawString(isHittingMode ? "Hitting Mode" : "Pitching Mode (Manual Aim)", 20, 30);
+        // 顯示當前模式和投手名稱
+        g2d.drawString(isHittingMode ? "Hitting Mode" : ("Pitching Mode - " + (currentPitcher != null ? currentPitcher.getPname() : "N/A")), 20, 30);
+        
         if (isHittingMode) {
             g2d.setFont(new Font("Arial", Font.PLAIN, 12));
             g2d.drawString("Space=Swing | M=Menu | ESC=Pause", 20, 50);
@@ -389,17 +412,26 @@ public class MLBsim extends JPanel {
                 pitchList += (i + 1) + "=" + availablePitches[i] + " ";
             }
             g2d.drawString(pitchList, 20, 50);
-            g2d.setFont(new Font("Arial", Font.PLAIN, 12));
-            g2d.drawString("F1=All | F2=Wheeler | F3=Fried | F4=Ohtani | F5=Skenes | F6=Rogers", 20, 70);
-            g2d.drawString("M=Menu | Space=Reset | ESC=Pause", 20, 90);
             
-            PitchData data = pitchDatabase.get(pitchType.equals("none") ? pitchDatabase.keySet().iterator().next() : pitchType);
-            if (data != null) {
-                g2d.drawString("Speed: " + String.format("%.1f mph", data.releaseSpeed_mph), 20, 110);
+            g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+            g2d.drawString("M=Menu | C=Change Pitcher | Space=Reset | ESC=Pause", 20, 70); // 新增 C 鍵提示
+            
+            // 顯示當前球種的具體數據 (速度)
+            TrajectoryData displayData = null;
+            if (!pitchType.equals("none") && pitchDatabase.containsKey(pitchType)) {
+                displayData = pitchDatabase.get(pitchType);
+            } else if (!pitchDatabase.isEmpty()) {
+                // 如果沒有明確選擇球種，顯示列表中的第一個球種數據
+                displayData = pitchDatabase.values().iterator().next();
             }
-            if(isPitching) g2d.drawString("Pitching: " + pitchType, 20, 130);
-            else if(ballReachedCatcher) g2d.drawString("Ball reached catcher.", 20, 130);
-            else g2d.drawString("Select Pitcher (F1-F6), Aim, Select Pitch.", 20, 130);
+
+            if (displayData != null) {
+                g2d.drawString("Speed: " + String.format("%.1f mph", displayData.getSpeed()), 20, 90);
+            }
+
+            if(isPitching) g2d.drawString("Pitching: " + pitchType, 20, 110);
+            else if(ballReachedCatcher) g2d.drawString("Ball reached catcher.", 20, 110);
+            else g2d.drawString("Select Pitch (1-" + availablePitches.length + "), Aim.", 20, 110);
         }
     }
 
@@ -421,20 +453,23 @@ public class MLBsim extends JPanel {
         if (mousePos == null) return;
         double screenAimMinX = 200, screenAimMaxX = windowWidth - 200;
         double screenAimMinY = 150, screenAimMaxY = windowHeight - 150;
-        double worldTargetMinX = -2.0, worldTargetMaxX = 2.0;
-        double worldTargetMinY = 0.5, worldTargetMaxY = 4.5;
+        double worldTargetMinX = -2.0, worldTargetMaxX = 2.0; // 調整 X 軸瞄準範圍
+        double worldTargetMinY = 0.5, worldTargetMaxY = 4.5; // 調整 Y 軸瞄準範圍
+        
         double percentX = (mousePos.x - screenAimMinX) / (screenAimMaxX - screenAimMinX);
         double percentY = (mousePos.y - screenAimMinY) / (screenAimMaxY - screenAimMinY);
+        
         percentX = Math.max(0, Math.min(1, percentX));
-        percentY = Math.max(0, Math.min(1, percentY));
+        percentY = Math.max(0, Math.min(1, percentY)); // Y 軸倒置，因為螢幕 Y 軸向下增加
+
         aimX_ft = worldTargetMinX + percentX * (worldTargetMaxX - worldTargetMinX);
-        aimY_ft = worldTargetMinY + (1 - percentY) * (worldTargetMaxY - worldTargetMinY);
+        aimY_ft = worldTargetMinY + (1 - percentY) * (worldTargetMaxY - worldTargetMinY); // (1 - percentY) 使滑鼠向上移動時 Y 值增大
     }
     
     private void drawAimingReticle(Graphics2D g2d) {
         Point screenPos = project3D(aimX_ft, aimY_ft, endZ_ft);
         if (screenPos == null) return;
-        g2d.setColor(new Color(255, 0, 0, 150));
+        g2d.setColor(new Color(255, 0, 0, 150)); // 半透明紅色
         g2d.setStroke(new BasicStroke(2));
         int size = 15;
         g2d.drawLine(screenPos.x - size, screenPos.y, screenPos.x + size, screenPos.y);
@@ -444,85 +479,124 @@ public class MLBsim extends JPanel {
     private void setupKeyBindings() {
         InputMap inputMap = this.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = this.getActionMap();
+
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0, false), "swingAction");
         actionMap.put("swingAction", new SwingAction());
-        for (int i = 0; i <= 9; i++) {
+
+        // 為 1-9 數字鍵綁定球種選擇
+        // 假設球種數量不會超過 9 種，或者需要更複雜的選球邏輯
+        for (int i = 1; i <= 9; i++) { 
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_0 + i, 0), "pitchAction" + i);
             actionMap.put("pitchAction" + i, new PitchSelectAction(i));
         }
-        for (int i = 0; i < 6; i++) {
-             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F1 + i, 0), "pitcherAction" + (i + 1));
-             actionMap.put("pitcherAction" + (i + 1), new PitcherSelectAction(i + 1));
-        }
+
+        // 移除原有的 F1-F6 投手選擇綁定，因為現在從 PitchSelectionPanel 選擇
+        // for (int i = 0; i < 6; i++) {
+        //      inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F1 + i, 0), "pitcherAction" + (i + 1));
+        //      actionMap.put("pitcherAction" + (i + 1), new PitcherSelectAction(i + 1));
+        // }
+        
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0, true), "resetAction");
         actionMap.put("resetAction", new ResetAction());
+
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_M, 0), "menuAction");
         actionMap.put("menuAction", new MenuAction());
+
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "pauseAction");
         actionMap.put("pauseAction", new PauseAction());
+
+        // 新增 'C' 鍵綁定，返回投手選擇介面
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, 0), "changePitcherAction");
+        actionMap.put("changePitcherAction", new ChangePitcherAction());
     }
 
+    // 抽象類別，方便統一管理遊戲動作
     private abstract class GameAction extends AbstractAction { }
-    private class SwingAction extends GameAction { @Override public void actionPerformed(ActionEvent e) { if (isHittingMode) { if (hitResult != null) { resetPitch(); } else if (isPitching && !swingAttempted) { swingAttempted = true; double swingTimeRatio = (startZ_ft - z_ft) / (startZ_ft - endZ_ft); final double PERFECT_START = 0.91, PERFECT_END = 0.97; final double GOOD_START = 0.86, GOOD_END = 1.0; final double OK_START = 0.82, OK_END = 1.04; if (swingTimeRatio >= PERFECT_START && swingTimeRatio <= PERFECT_END) { hitResult = "Perfect"; } else if (swingTimeRatio > PERFECT_END && swingTimeRatio <= GOOD_END) { hitResult = "A bit late"; } else if (swingTimeRatio < PERFECT_START && swingTimeRatio >= GOOD_START) { hitResult = "A bit early"; } else if (swingTimeRatio > GOOD_END && swingTimeRatio <= OK_END) { hitResult = "Late"; } else if (swingTimeRatio < GOOD_START && swingTimeRatio >= OK_START) { hitResult = "Early"; } else { hitResult = "Miss"; } } } } }
-    private class PitchSelectAction extends GameAction { private int pitchIndex; public PitchSelectAction(int index) { this.pitchIndex = index == 0 ? 9 : index - 1; } @Override public void actionPerformed(ActionEvent e) { if (!isHittingMode) { String[] availablePitches = pitchDatabase.keySet().toArray(new String[0]); if (pitchIndex < availablePitches.length) { startPitch(availablePitches[pitchIndex]); } } } }
-    private class PitcherSelectAction extends GameAction {
-        private int pitcherNum;
-        public PitcherSelectAction(int num) { this.pitcherNum = num; }
-        @Override public void actionPerformed(ActionEvent e) {
-            if (!isHittingMode) {
-                switch (pitcherNum) {
-                    case 1: initialize_AllPitches(pitchDatabase); break;
-                    case 2: initialize_ZackWheeler(pitchDatabase); break;
-                    case 3: initialize_MaxFried(pitchDatabase); break;
-                    case 4: initialize_ShoheiOhtani(pitchDatabase); break;
-                    case 5: initialize_PaulSkenes(pitchDatabase); break;
-                    case 6: initialize_TylerRogers(pitchDatabase); break;
+
+    private class SwingAction extends GameAction {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (isHittingMode) {
+                if (hitResult != null) { // 如果有打擊結果，表示本球局結束，按空格重置
+                    resetPitch();
+                } else if (isPitching && !swingAttempted) {
+                    swingAttempted = true;
+                    // 計算揮棒時機
+                    double swingTimeRatio = (startZ_ft - z_ft) / (startZ_ft - endZ_ft);
+                    final double PERFECT_START = 0.91, PERFECT_END = 0.97;
+                    final double GOOD_START = 0.86, GOOD_END = 1.0;
+                    final double OK_START = 0.82, OK_END = 1.04;
+
+                    if (swingTimeRatio >= PERFECT_START && swingTimeRatio <= PERFECT_END) {
+                        hitResult = "Perfect";
+                    } else if (swingTimeRatio > PERFECT_END && swingTimeRatio <= GOOD_END) {
+                        hitResult = "A bit late";
+                    } else if (swingTimeRatio < PERFECT_START && swingTimeRatio >= GOOD_START) {
+                        hitResult = "A bit early";
+                    } else if (swingTimeRatio > GOOD_END && swingTimeRatio <= OK_END) {
+                        hitResult = "Late";
+                    } else if (swingTimeRatio < GOOD_START && swingTimeRatio >= OK_START) {
+                        hitResult = "Early";
+                    } else {
+                        hitResult = "Miss";
+                    }
                 }
+            }
+        }
+    }
+
+    private class PitchSelectAction extends GameAction {
+        private int pitchNumber; // 修改為 pitchNumber，直接對應按下的數字鍵
+        public PitchSelectAction(int number) { 
+            this.pitchNumber = number; 
+        }
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (!isHittingMode) {
+                // 從當前投手的 pitchDatabase 中獲取球種列表
+                String[] availablePitches = pitchDatabase.keySet().toArray(new String[0]);
+                // 檢查按下的數字是否在有效範圍內
+                if (pitchNumber >= 1 && pitchNumber <= availablePitches.length) {
+                    startPitch(availablePitches[pitchNumber - 1]); // 陣列索引從 0 開始
+                } else {
+                    System.out.println("Invalid pitch selection. Available pitches are 1 to " + availablePitches.length);
+                }
+            }
+        }
+    }
+
+    // 移除 PitcherSelectAction，因為現在投手選擇在 PitchSelectionPanel 中進行
+    // private class PitcherSelectAction extends GameAction { ... }
+
+    private class ResetAction extends GameAction {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (!isHittingMode) { // 只在投球模式下按空格是重置投球
                 resetPitch();
             }
         }
     }
-    private class ResetAction extends GameAction { @Override public void actionPerformed(ActionEvent e) { if (!isHittingMode) resetPitch(); } }
-    private class MenuAction extends GameAction { @Override public void actionPerformed(ActionEvent e) { showStartScreen(mainFrame); } }
-    private class PauseAction extends GameAction { @Override public void actionPerformed(ActionEvent e) { togglePause(); } }
-    
-    static class StartScreen extends JPanel {
-        public StartScreen(JFrame frame) {
-            setLayout(null); setBackground(new Color(135, 206, 235));
-            JLabel title = new JLabel("Baseball Simulator"); title.setFont(new Font("Arial", Font.BOLD, 36)); title.setForeground(Color.WHITE); title.setBounds(300, 50, 400, 50); title.setHorizontalAlignment(SwingConstants.CENTER); add(title);
-            JButton pitchingButton = new JButton("Pitching"); pitchingButton.setBounds(300, 500, 200, 50); pitchingButton.addActionListener(e -> showGamePanel(frame, false)); add(pitchingButton);
-            JButton hittingButton = new JButton("Hitting"); hittingButton.setBounds(500, 500, 200, 50); hittingButton.addActionListener(e -> showGamePanel(frame, true)); add(hittingButton);
+
+    private class MenuAction extends GameAction {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            Main.showStartScreen(mainFrame); // 返回主菜單
         }
     }
 
-    public static void showStartScreen(JFrame frame) {
-        frame.getContentPane().removeAll();
-        StartScreen startScreen = new StartScreen(frame);
-        frame.add(startScreen);
-        frame.revalidate();
-        frame.repaint();
+    private class PauseAction extends GameAction {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            togglePause(); // 暫停/恢復遊戲
+        }
     }
 
-    public static void showGamePanel(JFrame frame, boolean isHittingMode) {
-        frame.getContentPane().removeAll();
-        MLBsim panel = new MLBsim(isHittingMode, frame);
-        frame.add(panel);
-        frame.revalidate();
-        frame.repaint();
-        panel.requestFocusInWindow();
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Baseball Simulator");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(1000, 700);
-            frame.setLocationRelativeTo(null);
-            frame.setResizable(false);
-            
-            showStartScreen(frame);
-            
-            frame.setVisible(true);
-        });
+    private class ChangePitcherAction extends GameAction {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (!isHittingMode) { // 只有在投球模式下才允許切換投手
+                Main.showPitchSelectionScreen(mainFrame); // 返回投手選擇介面
+            }
+        }
     }
 }
