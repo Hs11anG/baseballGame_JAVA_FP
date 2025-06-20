@@ -9,7 +9,7 @@ import java.util.Random;
 import java.util.Map;
 import java.util.HashMap;
 
-public class CatcherPerspectivePitch extends JPanel {
+public class MLBsim extends JPanel {
     private Timer timer;
     private JFrame mainFrame;
 
@@ -76,7 +76,7 @@ public class CatcherPerspectivePitch extends JPanel {
     }
     private final Map<String, PitchData> pitchDatabase = new HashMap<>();
 
-    public CatcherPerspectivePitch(boolean hittingMode, JFrame frame) {
+    public MLBsim(boolean hittingMode, JFrame frame) {
         this.isHittingMode = hittingMode;
         this.mainFrame = frame;
         
@@ -99,7 +99,7 @@ public class CatcherPerspectivePitch extends JPanel {
         timer.start();
 
         try {
-            ballImage = ImageIO.read(new File("ball.png"));
+            ballImage = ImageIO.read(new File("src/ball.png"));
         } catch (IOException e) {
             System.err.println("Failed to load ball image: " + e.getMessage());
         }
@@ -128,7 +128,7 @@ public class CatcherPerspectivePitch extends JPanel {
     private void initialize_ZackWheeler(Map<String, PitchData> db) {
         db.clear();
         db.put("FF", new PitchData(95.2, -8.2, -15.5, -1.8, 6.1));
-        db.put("SI", new PitchData(94.5, -12.0, -22.0, -1.9, 6.0));
+        db.put("SI", new PitchData(94.5, -10.0, -20.3, -1.9, 5.2));
         db.put("SL", new PitchData(90.8, 3.0, -24.0, -1.7, 6.1));
         db.put("CU", new PitchData(81.0, 9.0, -48.0, -1.5, 6.2));
     }
@@ -153,8 +153,8 @@ public class CatcherPerspectivePitch extends JPanel {
 
     private void initialize_PaulSkenes(Map<String, PitchData> db) {
         db.clear();
-        db.put("FF", new PitchData(99.8, -8.5, -14.0, -1.9, 6.0));
-        db.put("FS", new PitchData(94.7, -13.0, -30.0, -2.0, 5.8));
+        db.put("FF", new PitchData(99.8, -8.6, -25.66, -2.4, 5.6));
+        db.put("FS", new PitchData(95.1, -13.0, -30.0, -2.0, 5.8));
         db.put("SL", new PitchData(86.8, 7.0, -34.0, -1.8, 6.1));
         db.put("CU", new PitchData(83.5, 7.5, -46.0, -1.7, 6.2));
     }
@@ -505,7 +505,7 @@ public class CatcherPerspectivePitch extends JPanel {
 
     public static void showGamePanel(JFrame frame, boolean isHittingMode) {
         frame.getContentPane().removeAll();
-        CatcherPerspectivePitch panel = new CatcherPerspectivePitch(isHittingMode, frame);
+        MLBsim panel = new MLBsim(isHittingMode, frame);
         frame.add(panel);
         frame.revalidate();
         frame.repaint();
