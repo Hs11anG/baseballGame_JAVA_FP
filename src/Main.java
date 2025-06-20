@@ -9,26 +9,9 @@ public class Main {
             frame.setLocationRelativeTo(null);
             frame.setResizable(false);
 
-            StartScreen startScreen = new StartScreen(
-                () -> {
-                    frame.getContentPane().removeAll();
-                    CatcherPerspectivePitch panel = new CatcherPerspectivePitch(false);
-                    frame.add(panel);
-                    frame.revalidate();
-                    frame.repaint();
-                    panel.requestFocusInWindow();
-                },
-                () -> {
-                    frame.getContentPane().removeAll();
-                    CatcherPerspectivePitch panel = new CatcherPerspectivePitch(true);
-                    frame.add(panel);
-                    frame.revalidate();
-                    frame.repaint();
-                    panel.requestFocusInWindow();
-                }
-            );
+            // Initialize the start screen
+            createStartScreen(frame);
 
-            frame.add(startScreen);
             frame.setVisible(true);
 
             System.out.println("=== Baseball Simulator ===");
@@ -45,5 +28,31 @@ public class Main {
             System.out.println("ESC - Pause");
             System.out.println("Any key to continue after result");
         });
+    }
+
+    private static void createStartScreen(JFrame frame) {
+        StartScreen startScreen = new StartScreen(
+            () -> {
+                frame.getContentPane().removeAll();
+                CatcherPerspectivePitch panel = new CatcherPerspectivePitch(false, () -> createStartScreen(frame));
+                frame.add(panel);
+                frame.revalidate();
+                frame.repaint();
+                panel.requestFocusInWindow();
+            },
+            () -> {
+                frame.getContentPane().removeAll();
+                CatcherPerspectivePitch panel = new CatcherPerspectivePitch(true, () -> createStartScreen(frame));
+                frame.add(panel);
+                frame.revalidate();
+                frame.repaint();
+                panel.requestFocusInWindow();
+            }
+        );
+        frame.getContentPane().removeAll();
+        frame.add(startScreen);
+        frame.revalidate();
+        frame.repaint();
+        startScreen.requestFocusInWindow();
     }
 }

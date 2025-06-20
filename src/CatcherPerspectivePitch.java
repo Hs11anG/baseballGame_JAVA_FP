@@ -37,10 +37,25 @@ public class CatcherPerspectivePitch extends JPanel {
     
     // Random number generator
     private final Random random = new Random();
+    
+    // Pause menu button
+    private JButton returnToMenuButton;
 
-    public CatcherPerspectivePitch(boolean hittingMode) {
+    public CatcherPerspectivePitch(boolean hittingMode, Runnable returnToMenuCallback) {
         this.isHittingMode = hittingMode;
         setFocusable(true);
+        setLayout(null); // Enable absolute positioning for button
+
+        // Initialize return to menu button
+        returnToMenuButton = new JButton("Return to Main Menu");
+        returnToMenuButton.setFont(new Font("Arial", Font.BOLD, 24));
+        returnToMenuButton.setBounds(GameConstants.WINDOW_WIDTH / 2 - 150, GameConstants.WINDOW_HEIGHT / 2 + 50, 300, 50);
+        returnToMenuButton.setBackground(Color.BLUE);
+        returnToMenuButton.setForeground(Color.WHITE);
+        returnToMenuButton.setVisible(false); // Hidden by default
+        returnToMenuButton.addActionListener(e -> returnToMenuCallback.run());
+        add(returnToMenuButton);
+
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -240,6 +255,9 @@ public class CatcherPerspectivePitch extends JPanel {
             String pauseText = "Paused";
             int textWidth = g2d.getFontMetrics().stringWidth(pauseText);
             g2d.drawString(pauseText, (GameConstants.WINDOW_WIDTH - textWidth) / 2, GameConstants.WINDOW_HEIGHT / 2);
+            returnToMenuButton.setVisible(true);
+        } else {
+            returnToMenuButton.setVisible(false);
         }
     }
 
